@@ -35,6 +35,7 @@ class worker(QtCore.QThread):
     expectNum = 0
     moneyNum = 0
     stoneNum = 0
+    isForceStop = False
 
     isStart = QtCore.pyqtSignal()
     isProgress = QtCore.pyqtSignal(str)
@@ -55,8 +56,11 @@ class worker(QtCore.QThread):
         self.stoneNum = stoneNum
         self.autoRestartDispatch = autoRestartDispatch
 
+    def forceStopWorker(self):
+        self.isForceStop = True
+
     def processDispatchMissionComplete(self, device, restartDispatchButton):
-        if not self.autoRestartDispatch:
+        if not self.autoRestartDispatch or self.isForceStop:
             return
         
         screenshot = asarray(device.screenshot())
@@ -68,6 +72,8 @@ class worker(QtCore.QThread):
             self.emitLog.emit("重新進行派遣任務")
             
             while True:
+                if self.isForceStop: break
+                
                 restartDispatchFoundResult: tuple = restartDispatchButtonLocation["result"]
                 doubleClick(
                     device,
@@ -102,6 +108,7 @@ class worker(QtCore.QThread):
         print("expectedNum: ", self.expectNum)
 
         try:
+            self.isForceStop = False
             self.emitLog.emit("===== 初始化 =====")
 
             QtCore.QThread.sleep(1)
@@ -155,6 +162,8 @@ class worker(QtCore.QThread):
             mysticFound = False
 
             while self.expectNum > 0 and self.moneyNum > 280000 and self.stoneNum >= 3:
+                if self.isForceStop: break
+                
                 screenshot = asarray(device.screenshot())
 
                 covenantLocation = aircv.find_template(screenshot, covenant, 0.9)
@@ -165,6 +174,8 @@ class worker(QtCore.QThread):
                     self.emitLog.emit("找到聖約書籤")
 
                     while True:
+                        if self.isForceStop: break
+                        
                         covenantFoundResult: tuple = covenantLocation["result"]
                         doubleClick(
                             device,
@@ -185,6 +196,8 @@ class worker(QtCore.QThread):
                             buyButtonFoundResult: tuple = buyButtonLocation["result"]
 
                             while True:
+                                if self.isForceStop: break
+                                
                                 doubleClick(
                                     device,
                                     buyButtonFoundResult[0],
@@ -228,6 +241,8 @@ class worker(QtCore.QThread):
                     self.emitLog.emit("找到神秘書籤")
 
                     while True:
+                        if self.isForceStop: break
+                        
                         mysticFoundResult: tuple = mysticLocation["result"]
                         doubleClick(
                             device,
@@ -248,6 +263,8 @@ class worker(QtCore.QThread):
                             buyButtonFoundResult: tuple = buyButtonLocation["result"]
 
                             while True:
+                                if self.isForceStop: break
+                                
                                 doubleClick(
                                     device,
                                     buyButtonFoundResult[0],
@@ -288,6 +305,8 @@ class worker(QtCore.QThread):
                         screenshot, refreshButton, 0.9
                     )
                     while True:
+                        if self.isForceStop: break
+                        
                         refreshButtonFoundResult: tuple = refreshButtonLocation[
                             "result"
                         ]
@@ -312,6 +331,8 @@ class worker(QtCore.QThread):
                             )
 
                             while True:
+                                if self.isForceStop: break
+                                
                                 doubleClick(
                                     device,
                                     refreshYesButtonFoundResult[0],
@@ -368,7 +389,6 @@ class worker(QtCore.QThread):
             self.emitLog.emit("獲得書籤:")
             self.emitLog.emit(f"聖約: {covenantFoundTime}次")
             self.emitLog.emit(f"神秘: {mysticFoundTime}次")
-
             self.isFinish.emit()
 
         except Exception as e:
@@ -698,9 +718,10 @@ class Ui_Main(object):
             self.worker.setVariable(startMode, expectNum, moneyNum, stoneNum, autoRestartDispatch)
             self.worker.start()
         else:
-            self.worker.terminate()
-            self.logTextBrowser.append("===== 停止 =====")
+            # self.worker.terminate()
+            self.worker.forceStopWorker()
             self.startProperty(False)
+            self.startButton.setEnabled(False)
 
     def startProperty(self, isDisabled: bool):
         if isDisabled:
@@ -729,6 +750,7 @@ class Ui_Main(object):
     def stopWorker(self):
         self.start = False
         self.startProperty(False)
+        self.startButton.setEnabled(True)
 
 
 if __name__ == "__main__":
